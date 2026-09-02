@@ -383,7 +383,7 @@ The sidebar also provides a dedicated **Display & units** section:
 - **Energy display:** kWh/h, MWh/h or GWh/y
 - **Mass-flow display:** kg/h, t/h, kg/d or t/d
 
-All engineering calculations remain in their native internal units. Currency and unit conversion is applied only to the dashboard presentation and user-facing electricity-price input. This prevents display-unit changes from silently changing the engineering equations.
+All engineering calculations remain in their native internal units. Currency and unit conversion is applied only to dashboard presentation. Electricity price is an explicit engineering-model input in USD/MWh; the selected display currency is shown as a converted reference value. This prevents display-unit changes from silently changing the engineering equations.
 
 > **FX note:** the dashboard uses an explicit, editable FX assumption rather than a live exchange-rate API. This keeps the deployment deterministic and usable without external API credentials. Update the FX rate when a different market assumption is required.
 
@@ -397,7 +397,7 @@ The dashboard displays:
 - CO₂ intensity
 - Material and utility balance with selected flow/energy units
 - Energy breakdown with the selected energy unit and percentage share
-- Economics table with dynamic currency headers such as `INR/year` and `INR/t NH₃`
+- Economics table with dynamic currency headers such as `INR/year` and `INR/t NH₃`, with annual costs and per-tonne costs populated consistently; LCOA is shown only as a per-tonne metric
 - Optimization result with converted economic values
 - Best-design CSV download
 
@@ -770,10 +770,6 @@ Key background sources include:
 
 **Abhishek Kumar Gond**  
 IIT Guwahati | Chemical Engineering
-
-- **Email : mr.abhishekaaa@gmail.com**
-- **[Portfolio]()**
-- **[LinkedIn](https://www.linkedin.com/in/abhishekkumargond/)**
 
 This repository demonstrates:
 

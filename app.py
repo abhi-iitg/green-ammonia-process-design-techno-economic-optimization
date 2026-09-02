@@ -13,6 +13,8 @@ from src.display import (
     format_money,
     convert_energy,
     convert_mass_flow,
+    build_economics_table,
+    build_energy_breakdown,
 )
 
 st.set_page_config(
@@ -34,52 +36,61 @@ st.markdown(
     """
 )
 
+# -----------------------------------------------------------------------------
+# Sidebar
+# -----------------------------------------------------------------------------
 with st.sidebar:
-    st.header("Scenario inputs")
+    st.header("Model inputs")
     annual_tpy = st.number_input(
         "NH₃ production (t/y)", min_value=1_000, max_value=1_000_000,
-        value=20_000, step=1_000
+        value=20_000, step=1_000,
+        help="Target annual ammonia production used by the engineering model.",
     )
     hours = st.number_input(
         "Operating hours (h/y)", min_value=1_000, max_value=8_760,
-        value=8_000, step=100
+        value=8_000, step=100,
+        help="Annual operating hours used to annualize hourly energy and material rates.",
     )
     h2_kwh = st.slider("Electrolyzer electricity (kWh/kg H₂)", 40.0, 70.0, 52.0, 0.5)
     n2_recovery = st.slider("N₂ recovery", 0.80, 0.99, 0.92, 0.01)
     conversion = st.slider("NH₃ single-pass conversion", 0.05, 0.40, 0.18, 0.01)
     pressure = st.slider("Synthesis pressure (bar)", 80, 220, 150, 5)
     carbon_factor = st.slider("Electricity carbon factor (kg CO₂e/kWh)", 0.0, 1.0, 0.05, 0.01)
+    electricity_price_usd = st.number_input(
+        "Electricity price (USD/MWh)",
+        min_value=0.0,
+        value=60.0,
+        step=1.0,
+        format="%.2f",
+        help="Engineering-model input. The model always calculates internally in USD/MWh; display currency does not change the engineering input.",
+    )
 
     st.divider()
     st.header("Display & units")
     currency = st.selectbox("Display currency", list(CURRENCIES), index=0)
     default_fx = CURRENCIES[currency]["per_usd"]
     fx_rate = st.number_input(
-        f"FX rate ({currency} per USD)", min_value=0.000001,
-        value=float(default_fx), step=max(default_fx * 0.01, 0.000001),
+        f"FX rate ({currency} per USD)",
+        min_value=0.000001,
+        value=float(default_fx),
+        step=max(default_fx * 0.01, 0.000001),
         format="%.6f",
-        help="Display/input conversion only. The engineering model remains internally denominated in USD."
+        help="Presentation conversion only. Example: 83 means 1 USD = 83 INR.",
     )
     energy_unit = st.selectbox("Energy display unit", list(ENERGY_UNITS), index=0)
     mass_unit = st.selectbox("Mass-flow display unit", list(MASS_FLOW_UNITS), index=0)
-    st.caption(
-        "Currency conversion is presentation-level. USD remains the model's internal currency. "
-        "Edit the FX rate when you want a different assumption."
-    )
 
     currency_meta = currency_info(currency, fx_rate)
     currency_symbol = currency_meta["symbol"]
-    electricity_default_display = 60.0 * fx_rate
-    electricity_price_display = st.number_input(
-        f"Electricity price ({currency}/MWh)",
-        min_value=0.0,
-        value=float(electricity_default_display),
-        step=max(electricity_default_display * 0.05, 0.01),
-        format="%.2f",
-        help=f"User-facing price in {currency}. Converted to USD/MWh internally using the FX rate above."
+    electricity_price_display = electricity_price_usd * fx_rate
+    st.caption(
+        f"Electricity price in selected currency: {currency_symbol}{electricity_price_display:,.2f}/MWh. "
+        "This is a converted display value; the model input remains USD/MWh."
     )
-    electricity_price_usd = electricity_price_display / fx_rate
 
+# -----------------------------------------------------------------------------
+# Engineering model
+# -----------------------------------------------------------------------------
 p = replace(
     Params(),
     annual_nh3_kg=annual_tpy * 1000,
@@ -102,7 +113,7 @@ except (AssertionError, ValueError, ZeroDivisionError) as exc:
     st.error(f"Scenario validation failed: {exc}")
     st.stop()
 
-# Display helpers. Model values remain in native units; only these values are converted.
+
 def money(value_usd: float, decimals: int = 0) -> str:
     return format_money(value_usd, currency, fx_rate, decimals)
 
@@ -114,37 +125,38 @@ def energy_value(value_kwh_h: float) -> float:
 def mass_value(value_kg_h: float) -> float:
     return convert_mass_flow(value_kg_h, mass_unit)
 
+# -----------------------------------------------------------------------------
+# KPI results
+# -----------------------------------------------------------------------------
 st.subheader("Scenario results")
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("NH₃ production", f"{mass_value(s['nh3_product_kg_h']):,.2f} {mass_unit}")
 c2.metric("Specific energy", f"{e['specific_kwh_kg_nh3']:.2f} kWh/kg NH₃")
-c3.metric("LCOA", f"{money(ec['lcoa_usd_per_t'], 0)}/t NH₃")
+c3.metric(
+    f"LCOA ({currency}/t NH₃)",
+    f"{money(ec['lcoa_usd_per_t'], 2)}/t NH₃",
+)
 c4.metric("CO₂ intensity", f"{em['kgco2_per_kg_nh3']:.3f} kg CO₂e/kg")
 
 st.caption(
-    f"All economic values below are displayed in {currency}. Internal model currency: USD. "
+    f"All economic values are displayed in {currency}. Internal model currency: USD. "
     f"FX assumption: 1 USD = {fx_rate:g} {currency}."
 )
 
+# -----------------------------------------------------------------------------
+# Material and utility balance
+# -----------------------------------------------------------------------------
 st.subheader("Material and utility balance")
 balance = pd.DataFrame(
     {
         "Metric": [
-            "H₂ fresh feed",
-            "N₂ gross feed",
-            "Water feed",
-            "H₂ recycle",
-            "N₂ recycle",
-            "Total utility demand",
-            "Useful heat credit",
+            "H₂ fresh feed", "N₂ gross feed", "Water feed", "H₂ recycle", "N₂ recycle",
+            "Total energy demand", "Useful heat credit",
         ],
         "Value": [
-            mass_value(s["h2_feed_kg_h"]),
-            mass_value(s["n2_gross_kg_h"]),
-            mass_value(s["water_feed_kg_h"]),
-            s["h2_recycle_kmol_h"],
-            s["n2_recycle_kmol_h"],
-            energy_value(e["total_kwh_h"]),
+            mass_value(s["h2_feed_kg_h"]), mass_value(s["n2_gross_kg_h"]),
+            mass_value(s["water_feed_kg_h"]), s["h2_recycle_kmol_h"],
+            s["n2_recycle_kmol_h"], energy_value(e["total_kwh_h"]),
             energy_value(hb["useful_heat_credit_kwh_h"]),
         ],
         "Unit": [
@@ -158,63 +170,31 @@ st.dataframe(balance, use_container_width=True, hide_index=True)
 left, right = st.columns(2)
 with left:
     st.subheader("Energy breakdown")
-    energy_categories = ["Electrolyzer", "Compression", "Synthesis heat"]
-    energy_values = [
-        energy_value(e["electrolyzer_kwh_h"]),
-        energy_value(e["compression_kwh_h"]),
-        energy_value(e["synthesis_heat_kwh_h"]),
-    ]
-    energy_df = pd.DataFrame(
-        {f"Energy ({energy_unit})": energy_values}, index=energy_categories
-    )
-    st.bar_chart(energy_df)
-    total_energy = sum(energy_values)
-    shares = [100 * v / total_energy for v in energy_values]
-    energy_summary = pd.DataFrame(
-        {
-            "Energy category": energy_categories,
-            f"Energy ({energy_unit})": energy_values,
-            "Share (%)": shares,
-        }
-    )
+    energy_summary = build_energy_breakdown(e, energy_unit, hours)
+    chart = energy_summary.set_index("Energy category")[[f"Energy ({energy_unit})"]]
+    st.bar_chart(chart)
     st.dataframe(energy_summary, use_container_width=True, hide_index=True)
     st.caption(
-        "The breakdown uses the same selected display unit as the chart. "
-        "GWh/y annualizes each hourly energy-rate component using the selected operating hours."
+        "The chart and table use the same selected energy unit. kWh/h and MWh/h are hourly rates; "
+        "GWh/y annualizes each component using the selected operating hours."
     )
 
 with right:
     st.subheader("Economics")
-    economics_df = pd.DataFrame(
-        {
-            "Metric": [
-                "Annual electricity cost",
-                "Fixed OPEX",
-                "Variable OPEX",
-                "Annual operating cost",
-                "Annualized CAPEX",
-                "LCOA",
-            ],
-            f"{currency}/year": [
-                usd_to_currency(ec["electricity_cost_usd_y"], currency, fx_rate),
-                usd_to_currency(ec["fixed_opex_usd_y"], currency, fx_rate),
-                usd_to_currency(ec["variable_opex_usd_y"], currency, fx_rate),
-                usd_to_currency(ec["annual_operating_cost_usd_y"], currency, fx_rate),
-                usd_to_currency(ec["annualized_capex_usd_y"], currency, fx_rate),
-                None,
-            ],
-            f"{currency}/t NH₃": [
-                None, None, None, None, None,
-                usd_to_currency(ec["lcoa_usd_per_t"], currency, fx_rate),
-            ],
-        }
-    )
+    economics_df = build_economics_table(ec, annual_tpy, currency, fx_rate)
     st.dataframe(economics_df, use_container_width=True, hide_index=True)
     st.caption(
-        f"Electricity price used by the model: {money(electricity_price_usd, 2)}/MWh. "
-        "All rows are converted from the model's USD values using the selected FX rate."
+        "Annual-cost rows show both annual cost and cost per tonne of NH₃. "
+        "LCOA is inherently a cost-per-tonne metric, so its annual-cost cell is shown as —."
+    )
+    st.caption(
+        f"Electricity price used by the model: {money(electricity_price_usd, 2)}/MWh "
+        f"({electricity_price_usd:.2f} USD/MWh)."
     )
 
+# -----------------------------------------------------------------------------
+# Optimization
+# -----------------------------------------------------------------------------
 st.subheader("Optimization")
 st.write(
     "The optimization uses the repository's deterministic grid search. "
@@ -226,8 +206,12 @@ if st.button("Run optimization", type="primary"):
         best, rows = grid_optimize(p)
     st.success("Optimization complete.")
     best_display = best.copy()
-    best_display[f"lcoa_{currency}_per_t"] = usd_to_currency(best["lcoa_usd_per_t"], currency, fx_rate)
-    best_display[f"electricity_{currency}_per_mwh"] = usd_to_currency(best["electricity_usd_mwh"], currency, fx_rate)
+    best_display[f"LCOA ({currency}/t NH₃)"] = usd_to_currency(
+        best["lcoa_usd_per_t"], currency, fx_rate
+    )
+    best_display[f"Electricity price ({currency}/MWh)"] = usd_to_currency(
+        best["electricity_usd_mwh"], currency, fx_rate
+    )
     best_display.pop("lcoa_usd_per_t", None)
     best_display.pop("electricity_usd_mwh", None)
     best_df = pd.DataFrame([best_display])
@@ -247,6 +231,6 @@ st.markdown(
 )
 
 st.info(
-    "For a reproducible repository run, use `python -m pytest -q` followed by "
-    "`python -m src.run_all`. The generated CSVs and figures are stored in `results/` and `figures/`."
+    "For a reproducible repository run, use `python -m pytest -q` followed by `python -m src.run_all`. "
+    "The generated CSVs and figures are stored in `results/` and `figures/`."
 )
