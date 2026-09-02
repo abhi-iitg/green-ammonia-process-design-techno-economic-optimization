@@ -4,7 +4,7 @@
 
 ## 🚀 Live Demo
 
-👉 **[Launch the Green Ammonia Process Dashboard](https://green-ammonia-process-design-techno-economic-optimization-abhi.streamlit.app/)**
+👉 **[Launch Interactive Dashboard](https://green-ammonia-process-design-techno-economic-optimization-abhi.streamlit.app/)**
 
 [![Python Tests](https://github.com/abhi-iitg/green-ammonia-process-design-techno-economic-optimization/actions/workflows/ci.yml/badge.svg)](https://github.com/abhi-iitg/green-ammonia-process-design-techno-economic-optimization/actions/workflows/ci.yml)
 
