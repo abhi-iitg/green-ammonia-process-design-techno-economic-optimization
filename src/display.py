@@ -1,10 +1,15 @@
-"""Display-only unit and currency helpers for the Streamlit dashboard.
+"""Display-only unit, currency and dashboard-table helpers.
 
-The engineering model remains in its native units (USD, kg, kWh, bar, etc.).
-These helpers convert values only for presentation and user-facing inputs.
+The engineering model remains in native units:
+- USD for economics
+- kWh/h for energy rates
+- kg/h for mass flow
+
+All conversions in this module are presentation-level unless explicitly noted.
 """
-
 from __future__ import annotations
+
+import pandas as pd
 
 CURRENCIES = {
     "USD": {"symbol": "$", "per_usd": 1.0},
@@ -14,22 +19,11 @@ CURRENCIES = {
     "JPY": {"symbol": "¥", "per_usd": 150.0},
 }
 
-ENERGY_UNITS = {
-    "kWh/h": 1.0,
-    "MWh/h": 1.0 / 1000.0,
-    "GWh/y": "annual",
-}
-
-MASS_FLOW_UNITS = {
-    "kg/h": 1.0,
-    "t/h": 1.0 / 1000.0,
-    "kg/d": 24.0,
-    "t/d": 24.0 / 1000.0,
-}
+ENERGY_UNITS = {"kWh/h": 1.0, "MWh/h": 1.0 / 1000.0, "GWh/y": "annual"}
+MASS_FLOW_UNITS = {"kg/h": 1.0, "t/h": 1.0 / 1000.0, "kg/d": 24.0, "t/d": 24.0 / 1000.0}
 
 
 def currency_info(currency: str, custom_rate: float | None = None) -> dict:
-    """Return currency metadata; rate is selected-currency units per USD."""
     if currency not in CURRENCIES:
         raise ValueError(f"Unsupported currency: {currency}")
     info = CURRENCIES[currency].copy()
@@ -57,6 +51,8 @@ def format_money(value_usd: float, currency: str, custom_rate: float | None = No
 def convert_energy(value_kwh_h: float, unit: str, hours: float) -> float:
     if unit not in ENERGY_UNITS:
         raise ValueError(f"Unsupported energy unit: {unit}")
+    if hours <= 0:
+        raise ValueError("Operating hours must be greater than zero")
     if unit == "GWh/y":
         return float(value_kwh_h) * float(hours) / 1_000_000.0
     return float(value_kwh_h) * float(ENERGY_UNITS[unit])
@@ -70,3 +66,64 @@ def convert_mass_flow(value_kg_h: float, unit: str) -> float:
 
 def format_quantity(value: float, unit: str, decimals: int = 2) -> str:
     return f"{value:,.{decimals}f} {unit}"
+
+
+def build_economics_table(ec: dict, annual_nh3_t: float, currency: str, fx_rate: float) -> pd.DataFrame:
+    """Build a complete, unit-consistent economics table.
+
+    Annual-cost rows show both annual cost and cost per tonne. LCOA is already
+    a unit-cost metric, so its annual column is shown as an em dash rather than
+    the misleading ``None`` values used by the earlier dashboard.
+    """
+    if annual_nh3_t <= 0:
+        raise ValueError("Annual NH3 production must be greater than zero")
+
+    annual_rows = [
+        ("Annual electricity cost", ec["electricity_cost_usd_y"]),
+        ("Fixed OPEX", ec["fixed_opex_usd_y"]),
+        ("Variable OPEX", ec["variable_opex_usd_y"]),
+        ("Annual operating cost", ec["annual_operating_cost_usd_y"]),
+        ("Annualized CAPEX", ec["annualized_capex_usd_y"]),
+    ]
+    total_annualized = ec["annual_operating_cost_usd_y"] + ec["annualized_capex_usd_y"]
+
+    rows = []
+    for metric, usd_y in annual_rows:
+        rows.append({
+            "Metric": metric,
+            f"{currency}/year": usd_to_currency(usd_y, currency, fx_rate),
+            f"{currency}/t NH₃": usd_to_currency(usd_y / annual_nh3_t, currency, fx_rate),
+        })
+
+    rows.append({
+        "Metric": "Total annualized cost",
+        f"{currency}/year": usd_to_currency(total_annualized, currency, fx_rate),
+        f"{currency}/t NH₃": usd_to_currency(total_annualized / annual_nh3_t, currency, fx_rate),
+    })
+    rows.append({
+        "Metric": "LCOA",
+        f"{currency}/year": "—",
+        f"{currency}/t NH₃": usd_to_currency(ec["lcoa_usd_per_t"], currency, fx_rate),
+    })
+    return pd.DataFrame(rows)
+
+
+def build_energy_breakdown(e: dict, unit: str, hours: float) -> pd.DataFrame:
+    categories = ["Electrolyzer", "Compression", "Synthesis heat"]
+    values = [
+        convert_energy(e["electrolyzer_kwh_h"], unit, hours),
+        convert_energy(e["compression_kwh_h"], unit, hours),
+        convert_energy(e["synthesis_heat_kwh_h"], unit, hours),
+    ]
+    total = sum(values)
+    shares = [100.0 * value / total for value in values] if total > 0 else [0.0] * len(values)
+    return pd.DataFrame({"Energy category": categories, f"Energy ({unit})": values, "Share (%)": shares})
+
+
+def convert_electricity_price_to_usd(display_price: float, currency: str, fx_rate: float) -> float:
+    if display_price < 0:
+        raise ValueError("Electricity price cannot be negative")
+    if fx_rate <= 0:
+        raise ValueError("FX rate must be greater than zero")
+    currency_info(currency, fx_rate)
+    return float(display_price) / float(fx_rate)
