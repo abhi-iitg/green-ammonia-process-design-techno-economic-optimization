@@ -771,6 +771,10 @@ Key background sources include:
 **Abhishek Kumar Gond**  
 IIT Guwahati | Chemical Engineering
 
+- **Email : mr.abhishekaaa@gmail.com**
+- **[Portfolio]()**
+- **[LinkedIn](https://www.linkedin.com/in/abhishekkumargond/)**
+
 This repository demonstrates:
 
 **Process Engineering + Python Modeling + Techno-Economic Analysis + Optimization + Reproducibility + Deployment**
