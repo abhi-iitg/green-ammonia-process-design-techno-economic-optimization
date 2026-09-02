@@ -359,9 +359,11 @@ The lowest-LCOA point in the predefined screening grid is:
 
 ## 📈 Dashboard & Deployment
 
-The repository now includes an interactive **Streamlit** dashboard in `app.py`.
+The repository includes an interactive **Streamlit** dashboard in `app.py`. The dashboard is designed for scenario exploration without editing the engineering model source code.
 
-The dashboard allows a user to change:
+### Scenario controls
+
+The sidebar exposes:
 
 - NH₃ production target
 - Operating hours
@@ -369,19 +371,34 @@ The dashboard allows a user to change:
 - N₂ recovery
 - Single-pass conversion
 - Synthesis pressure
-- Electricity price
 - Electricity carbon factor
+- Electricity price
 
-It then displays:
+### Display controls
 
-- Production rate
+The sidebar also provides a dedicated **Display & units** section:
+
+- **Display currency:** USD, EUR, GBP, INR or JPY
+- **FX rate:** selected-currency units per USD
+- **Energy display:** kWh/h, MWh/h or GWh/y
+- **Mass-flow display:** kg/h, t/h, kg/d or t/d
+
+All engineering calculations remain in their native internal units. Currency and unit conversion is applied only to the dashboard presentation and user-facing electricity-price input. This prevents display-unit changes from silently changing the engineering equations.
+
+> **FX note:** the dashboard uses an explicit, editable FX assumption rather than a live exchange-rate API. This keeps the deployment deterministic and usable without external API credentials. Update the FX rate when a different market assumption is required.
+
+### Dashboard outputs
+
+The dashboard displays:
+
+- Production rate with the selected mass-flow unit
 - Specific energy
-- LCOA
+- LCOA in the selected currency per tonne NH₃
 - CO₂ intensity
-- Material/utility balance
-- Energy breakdown
-- Economics
-- Optimization result
+- Material and utility balance with selected flow/energy units
+- Energy breakdown with the selected energy unit and percentage share
+- Economics table with dynamic currency headers such as `INR/year` and `INR/t NH₃`
+- Optimization result with converted economic values
 - Best-design CSV download
 
 ### Local dashboard
@@ -398,9 +415,37 @@ See the complete guide:
 
 `docs/deployment.md`
 
-The recommended deployment target is **Streamlit Community Cloud** because the repository already contains a root-level `app.py`, `requirements.txt` and `.streamlit/config.toml`.
+The recommended deployment target is **Streamlit Community Cloud** because the repository contains a root-level `app.py`, `requirements.txt` and `.streamlit/config.toml`.
 
 ---
+
+## 💱 Currency & Unit Controls
+
+The dashboard deliberately separates **engineering units** from **display units**. The model calculates internally using USD, kg, kWh and the existing engineering basis. The UI converts values only after the calculations are complete.
+
+### Example
+
+If the model calculates:
+
+```text
+LCOA = $1,025.11/t NH₃
+```
+
+and the dashboard is set to INR with:
+
+```text
+1 USD = 83 INR
+```
+
+the displayed value becomes approximately:
+
+```text
+₹85,084.24/t NH₃
+```
+
+Likewise, an energy rate of `27,081.10 kWh/h` becomes approximately `27.081 MWh/h` or `216.649 GWh/y` at 8,000 operating hours. The underlying model value does not change.
+
+This design fixes a common dashboard error where the number changes but the table heading or chart axis still shows the old unit. The selected currency/unit is now used consistently in metric cards, table headers, charts, material balances and optimization downloads.
 
 ## 🧪 Aspen Plus Validation
 
@@ -450,7 +495,7 @@ Run:
 python -m pytest -q
 ```
 
-The current suite contains **15 automated tests** covering:
+The current suite contains **20 automated tests** covering:
 
 - Production-rate scaling
 - Stoichiometric relationships
