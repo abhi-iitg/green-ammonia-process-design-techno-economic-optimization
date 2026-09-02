@@ -71,9 +71,9 @@ def format_quantity(value: float, unit: str, decimals: int = 2) -> str:
 def build_economics_table(ec: dict, annual_nh3_t: float, currency: str, fx_rate: float) -> pd.DataFrame:
     """Build a complete, unit-consistent economics table.
 
-    Annual-cost rows show both annual cost and cost per tonne. LCOA is already
-    a unit-cost metric, so its annual column is shown as an em dash rather than
-    the misleading ``None`` values used by the earlier dashboard.
+    Annual-cost rows show both annual cost and cost per tonne. LCOA is a
+    per-tonne metric, so its annual column shows the equivalent annualized
+    cost (LCOA multiplied by annual NH3 production) rather than a blank/None.
     """
     if annual_nh3_t <= 0:
         raise ValueError("Annual NH3 production must be greater than zero")
@@ -100,9 +100,14 @@ def build_economics_table(ec: dict, annual_nh3_t: float, currency: str, fx_rate:
         f"{currency}/year": usd_to_currency(total_annualized, currency, fx_rate),
         f"{currency}/t NH₃": usd_to_currency(total_annualized / annual_nh3_t, currency, fx_rate),
     })
+    # LCOA is defined per tonne, but its annual equivalent is still meaningful:
+    # LCOA × annual NH3 production = annualized cost represented by the LCOA.
+    # Showing this value avoids an apparently empty cell while keeping the
+    # relationship between the two units explicit.
+    lcoa_annual_usd = ec["lcoa_usd_per_t"] * annual_nh3_t
     rows.append({
         "Metric": "LCOA",
-        f"{currency}/year": "—",
+        f"{currency}/year": usd_to_currency(lcoa_annual_usd, currency, fx_rate),
         f"{currency}/t NH₃": usd_to_currency(ec["lcoa_usd_per_t"], currency, fx_rate),
     })
     return pd.DataFrame(rows)
