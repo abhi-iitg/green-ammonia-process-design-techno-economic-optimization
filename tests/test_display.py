@@ -48,8 +48,10 @@ def test_economics_table_has_no_none_values():
     ec = economics(p)
     table = build_economics_table(ec, p.annual_nh3_kg / 1000.0, "USD", 1.0)
     assert not table.isna().any().any()
-    assert "—" in table["USD/year"].astype(str).tolist()
+    assert table["USD/year"].notna().all()
     assert table["USD/t NH₃"].notna().all()
+    assert "—" not in table["USD/year"].astype(str).tolist()
+    assert "None" not in table["USD/year"].astype(str).tolist()
 
 
 def test_economics_table_unit_costs_are_correct():
@@ -61,6 +63,7 @@ def test_economics_table_unit_costs_are_correct():
     assert math.isclose(elec["USD/t NH₃"], ec["electricity_cost_usd_y"] / annual_t)
     lcoa = table.loc[table["Metric"] == "LCOA"].iloc[0]
     assert math.isclose(lcoa["USD/t NH₃"], ec["lcoa_usd_per_t"])
+    assert math.isclose(lcoa["USD/year"], ec["lcoa_usd_per_t"] * annual_t)
 
 
 def test_economics_currency_columns_change_together():
