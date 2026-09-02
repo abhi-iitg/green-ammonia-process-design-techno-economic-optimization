@@ -2,6 +2,10 @@
 
 > **Engineering screening + decision-support dashboard for a green ammonia process using PEM electrolysis, nitrogen separation and Haber–Bosch synthesis.**
 
+## 🚀 Live Demo
+
+👉 **[Launch the Green Ammonia Process Dashboard](https://green-ammonia-process-design-techno-economic-optimization-abhi.streamlit.app/)**
+
 [![Python Tests](https://github.com/abhi-iitg/green-ammonia-process-design/actions/workflows/ci.yml/badge.svg)](https://github.com/abhi-iitg/green-ammonia-process-design/actions/workflows/ci.yml)
 
 GreenAmmonia-Opt is a reproducible chemical-engineering screening model for a **20,000 t/y green ammonia plant**. It combines material balances, electrolyzer energy demand, nitrogen recovery, Haber–Bosch synthesis/recycle, compression, heat allowance, techno-economics, carbon intensity, deterministic optimization, sensitivity analysis and an interactive Streamlit dashboard.
