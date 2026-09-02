@@ -185,7 +185,7 @@ with right:
     st.dataframe(economics_df, use_container_width=True, hide_index=True)
     st.caption(
         "Annual-cost rows show both annual cost and cost per tonne of NH₃. "
-        "LCOA is inherently a cost-per-tonne metric, so its annual-cost cell is shown as —."
+        "For LCOA, the annual column is the equivalent annualized cost (LCOA × annual NH₃ production)."
     )
     st.caption(
         f"Electricity price used by the model: {money(electricity_price_usd, 2)}/MWh "
