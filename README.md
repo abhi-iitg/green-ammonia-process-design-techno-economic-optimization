@@ -773,7 +773,7 @@ Key background sources include:
 ## 👤 Author
 
 **Abhishek Kumar Gond**  
-IIT Guwahati | Chemical Engineering
+B.Tech in Chemical Engineering @ IIT Guwahati
 
 - **Email : mr.abhishekaaa@gmail.com**
 - **[Portfolio]()**
