@@ -776,7 +776,6 @@ Key background sources include:
 B.Tech in Chemical Engineering @ IIT Guwahati
 
 - **Email : mr.abhishekaaa@gmail.com**
-- **[Portfolio]()**
 - **[LinkedIn](https://www.linkedin.com/in/abhishekkumargond/)**
 
 This repository demonstrates:
